@@ -7,26 +7,67 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using DoNotTrustWebClient.Data;
 using DoNotTrustWebClient.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using System.Security.Claims;
+using DoNotTrustWebClient.Models.ApplicationUsersViewModels;
 
 namespace DoNotTrustWebClient.Controllers
 {
-    public class ApplicationUsersController : Controller
-    {
-        private readonly ApplicationDbContext _context;
+	// [Authorize(Roles = "SystemAdministrator, CompanyAdministrator")]
+	public class ApplicationUsersController : Controller
+	{
+		private readonly ApplicationDbContext _context;
+		private readonly UserManager<ApplicationUser> userManager;
 
-        public ApplicationUsersController(ApplicationDbContext context)
-        {
-            _context = context;    
-        }
+		public ApplicationUsersController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+		{
+			_context = context;
+			this.userManager = userManager;
+		}
 
-        // GET: ApplicationUsers
-        public async Task<IActionResult> Index()
-        {
-            return View(await _context.ApplicationUser.ToListAsync());
-        }
+		// GET: ApplicationUsers
+		public async Task<IActionResult> Index(IndexViewModel vm)
+		{
+			ApplicationUser currentUser = await GetCurrentUser();
 
-        // GET: ApplicationUsers/Details/5
-        public async Task<IActionResult> Details(string id)
+			// výchozí oddìlení je oddìlení uživatele
+			if (vm.DepartmentId == null)
+			{
+				vm.DepartmentId = currentUser.Department.DepartmentId;
+			}
+
+			// administrator smí na všechny oddìlení, ostatní jen na svoji spoleènost
+			if (/* userIsAdministrator ||  */ User.Identity.Name == "haken@havit.cz")
+			{
+				vm.Departments = _context.Department
+									.Select(d => new SelectListItem() { Value = d.DepartmentId.ToString(), Text = d.Name });
+			}
+			else
+			{
+				vm.Departments = _context.Department
+									.Where(d => d.Company.CompanyId == currentUser.Department.Company.CompanyId)
+									.Select(d => new SelectListItem() { Value = d.DepartmentId.ToString(), Text = d.Name });
+			}
+
+			// naèti uživatele podle zvoleného oddìlení
+			vm.Users = await _context.ApplicationUser
+				.Where(u => u.Department.DepartmentId == vm.DepartmentId)
+				.Include(u => u.Department.Company).ToListAsync();
+
+			return View(vm);
+		}
+
+		private async Task<ApplicationUser> GetCurrentUser()
+		{
+			var currentUser = await userManager.GetUserAsync(HttpContext.User);
+			await _context.Entry(currentUser).Reference(u => u.Department).LoadAsync();
+			await _context.Entry(currentUser.Department).Reference(d => d.Company).LoadAsync();
+			return currentUser;
+		}
+
+		// GET: ApplicationUsers/Details/5
+		public async Task<IActionResult> Details(string id)
         {
             if (id == null)
             {
