@@ -7,8 +7,16 @@
 <h2>Index</h2>
 
 <form method="post">
-	<select asp-for="DepartmentId" asp-items="Model.Departments" ></select>
-	<input type="submit" value="Filtruj" />
+	<table class="table">
+		<tr>
+			<td>
+				<select asp-for="DepartmentId" asp-items="Model.Departments"></select>
+			</td>
+			<td>
+				<input type="submit" value="Filtruj" />
+			</td>
+		</tr>
+	</table>
 </form>
 
 <p>

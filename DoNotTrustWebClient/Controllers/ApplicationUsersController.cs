@@ -38,16 +38,18 @@ namespace DoNotTrustWebClient.Controllers
 			}
 
 			// administrator smí na všechny oddìlení, ostatní jen na svoji spoleènost
-			if (/* userIsAdministrator ||  */ User.Identity.Name == "haken@havit.cz")
+			if (IsUserAdministrator())
 			{
 				vm.Departments = _context.Department
-									.Select(d => new SelectListItem() { Value = d.DepartmentId.ToString(), Text = d.Name });
+									.Include(d => d.Company)
+									.Select(d => new SelectListItem() { Value = d.DepartmentId.ToString(), Text = $"{d.Company.Name} - {d.Name}" });
 			}
 			else
 			{
 				vm.Departments = _context.Department
 									.Where(d => d.Company.CompanyId == currentUser.Department.Company.CompanyId)
-									.Select(d => new SelectListItem() { Value = d.DepartmentId.ToString(), Text = d.Name });
+									.Include(d => d.Company)
+									.Select(d => new SelectListItem() { Value = d.DepartmentId.ToString(), Text = $"{d.Company.Name} - {d.Name}" });
 			}
 
 			// naèti uživatele podle zvoleného oddìlení
@@ -56,6 +58,11 @@ namespace DoNotTrustWebClient.Controllers
 				.Include(u => u.Department.Company).ToListAsync();
 
 			return View(vm);
+		}
+
+		private bool IsUserAdministrator()
+		{
+			return User.Identity.Name == "haken@havit.cz";
 		}
 
 		private async Task<ApplicationUser> GetCurrentUser()
