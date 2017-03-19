@@ -14,7 +14,6 @@ using DoNotTrustWebClient.Models.ApplicationUsersViewModels;
 
 namespace DoNotTrustWebClient.Controllers
 {
-	// [Authorize(Roles = "SystemAdministrator, CompanyAdministrator")]
 	public class ApplicationUsersController : Controller
 	{
 		private readonly ApplicationDbContext _context;
@@ -37,27 +36,43 @@ namespace DoNotTrustWebClient.Controllers
 				vm.DepartmentId = currentUser.Department.DepartmentId;
 			}
 
-			// administrator smí na všechny oddìlení, ostatní jen na svoji spoleènost
 			if (IsUserAdministrator())
 			{
-				vm.Departments = _context.Department
-									.Include(d => d.Company)
-									.Select(d => new SelectListItem() { Value = d.DepartmentId.ToString(), Text = $"{d.Company.Name} - {d.Name}" });
+				// administrator smí na všechny oddìlení
+				vm.Departments = GetAllDepartmentsSelectList();
 			}
 			else
 			{
-				vm.Departments = _context.Department
-									.Where(d => d.Company.CompanyId == currentUser.Department.Company.CompanyId)
-									.Include(d => d.Company)
-									.Select(d => new SelectListItem() { Value = d.DepartmentId.ToString(), Text = $"{d.Company.Name} - {d.Name}" });
+				// administrator smí na všechny oddìlení
+				vm.Departments = GetCompanyDepartmentsSelectList(currentUser.Department.Company);
 			}
 
 			// naèti uživatele podle zvoleného oddìlení
-			vm.Users = await _context.ApplicationUser
-				.Where(u => u.Department.DepartmentId == vm.DepartmentId)
-				.Include(u => u.Department.Company).ToListAsync();
+			vm.Users = await GetUsersByDepartment(vm.DepartmentId);
 
 			return View(vm);
+		}
+
+		private async Task<List<ApplicationUser>> GetUsersByDepartment(int? departmentId)
+		{
+			return await _context.ApplicationUser
+							.Where(u => u.Department.DepartmentId == departmentId)
+							.Include(u => u.Department.Company).ToListAsync();
+		}
+
+		private IQueryable<SelectListItem> GetCompanyDepartmentsSelectList(Company company)
+		{
+			return _context.Department
+												.Where(d => d.Company.CompanyId == company.CompanyId)
+												.Include(d => d.Company)
+												.Select(d => new SelectListItem() { Value = d.DepartmentId.ToString(), Text = $"{d.Company.Name} - {d.Name}" });
+		}
+
+		private IQueryable<SelectListItem> GetAllDepartmentsSelectList()
+		{
+			return _context.Department
+												.Include(d => d.Company)
+												.Select(d => new SelectListItem() { Value = d.DepartmentId.ToString(), Text = $"{d.Company.Name} - {d.Name}" });
 		}
 
 		private bool IsUserAdministrator()
